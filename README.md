@@ -5,7 +5,7 @@ For more info on Swiss-Style tournaments look here: https://www.wikipedia.org/en
 
 To use, ensure that you have python 2.7 and psql install on your local machine. Additionally this package
 requires the below python packages:
-   bleach
+   bleach,
    psycopg2
 
 1. From CLI, cd to the directory where you downloaded the package and type the following command to 
