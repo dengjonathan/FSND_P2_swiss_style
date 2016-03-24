@@ -13,22 +13,22 @@ with the views (match_record, player_records) for ease of access:
    
 2. From a python interpreter, import tournament.py to access the following database functions:
 
-connect -- Meant to connect to the database 'tournament' created by the tournament.sql shell command
+   connect -- Meant to connect to the database 'tournament' created by the tournament.sql shell command
 
-deleteMatches -- Remove all the matches records from the database.
+   deleteMatches -- Remove all the matches records from the database.
 
-deletePlayers -- Remove all the player records from the database.
+   deletePlayers -- Remove all the player records from the database.
 
-countPlayers -- Returns the number of players currently registered
+   countPlayers -- Returns the number of players currently registered
 
-registerPlayer -- Adds a player to the tournament database.
+   registerPlayer -- Adds a player to the tournament database.
 
-playerStandings -- Returns a list of the players and their win records, sorted by wins. 
+   playerStandings -- Returns a list of the players and their win records, sorted by wins. 
                   You can use the player standings table created in your .sql file for reference.
                   
-reportMatch -- This is to simply populate the matches table and record the winner and loser as (winner,loser) in the insert statement.
+   reportMatch -- This is to simply populate the matches table and record the winner and loser as (winner,loser) in the                      insert statement.
 
-swissPairings -- Returns a list of pairs of players for the next round of a match in the form of tuples 
-                (id1, name1, id2, name2) for each match.
+   swissPairings -- Returns a list of pairs of players for the next round of a match in the form of tuples 
+                   (id1, name1, id2, name2) for each match.
 
 
