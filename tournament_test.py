@@ -146,10 +146,51 @@ def testPairings():
                 "After one match, players with one win should be paired.")
     print "10. After one match, players with one win are properly paired."
 
+def testPairingsOdd():
+    """
+    Test that pairings when there is an odd number of players.
+    """
+    deleteMatches()
+    deletePlayers()
+    registerPlayer("Twilight Sparkle")
+    registerPlayer("Fluttershy")
+    registerPlayer("Applejack")
+    registerPlayer("Pinkie Pie")
+    registerPlayer("Rarity")
+    registerPlayer("Rainbow Dash")
+    registerPlayer("Princess Celestia")
+    registerPlayer("Princess Luna")
+    registerPlayer("Ron Burgundy")
+    standings = playerStandings()
+    [id1, id2, id3, id4, id5, id6, id7, id8, id9] = [row[0] for row in standings]
+    pairings = swissPairings()
+    if len(pairings) != 4:
+        raise ValueError(
+            "For eight players, swissPairings should return 4 pairs. Got {pairs}".format(pairs=len(pairings)))
+    reportMatch(id1, id2)
+    reportMatch(id3, id4)
+    reportMatch(id5, id6)
+    reportMatch(id7, id8)
+    pairings = swissPairings()
+    if len(pairings) != 4:
+        raise ValueError(
+            "For eight players, swissPairings should return 4 pairs. Got {pairs}".format(pairs=len(pairings)))
+    print "Players %s were given byes in the two rounds" % BYE_PLAYERS
+    if len(BYE_PLAYERS) == 0:
+        raise ValueError(
+            "Odd man out should have been recorded in BYE_PLAYERS so that he is not given a 2nd bye"
+        )
+    if BYE_PLAYERS[0] == BYE_PLAYERS[1]:
+        raise ValueError(
+            "Player %s was given a bye twice- which shouldn't happen in this tournament."
+        )
+    print "11. When there is an odd number of players, one player randomly given a bye. Each"
+    print "player will only be given a bye one time in the tournament."
 
 if __name__ == '__main__':
     testCount()
     testStandingsBeforeMatches()
     testReportMatches()
     testPairings()
+    testPairingsOdd()
     print "Success!  All tests pass!"
