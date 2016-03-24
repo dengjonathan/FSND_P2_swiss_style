@@ -5,9 +5,12 @@
 import psycopg2
 import bleach
 
+# storing previous pairs to ensure they do not face each other again
+previous_matches = []
+
 
 def sanitizeInputs(input):
-    """Sanitizes inputs for scripts and apostrophes"""
+    """Takes string and sanitizes inputs for scripts and apostrophes"""
     input = bleach.clean(input)
     i = 0
     bad_apos = []
@@ -124,6 +127,7 @@ def reportMatch(winner, loser):
       winner:  the id number of the player who won
       loser:  the id number of the player who lost
     """
+    winner, loser = sanitizeInputs(winner), sanitizeInputs(loser)
     DB = connect()
     c = DB.cursor()
     c.execute(
