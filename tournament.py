@@ -3,37 +3,43 @@
 # tournament.py -- implementation of a Swiss-system tournament
 #
 import psycopg2
-import bleach
-
+import random
+import time
 # storing previous pairs to ensure they do not face each other again
 previous_matches = []
 
 
-def sanitizeInputs(input):
-    """Takes string and sanitizes inputs for scripts and apostrophes"""
-    input = bleach.clean(input)
-    i = 0
-    bad_apos = []
-    for i in range(len(input)):
-        if input[i] == "'":
-            bad_apos.append(i)
-    for i in bad_apos:
-        input = input[:i] + "'" + input[i:]
-    return input
+# def sanitizeInputs(input):
+#     """Takes string and sanitizes inputs for scripts and apostrophes"""
+#     input = bleach.clean(input)
+#     i = 0
+#     bad_apos = []
+#     for i in range(len(input)):
+#         if input[i] == "'":
+#             bad_apos.append(i)
+#     for i in bad_apos:
+#         input = input[:i] + "'" + input[i:]
+#     return input
 
 
 def connect():
     """Connect to the PostgreSQL database.  Returns a database connection."""
-    return psycopg2.connect("dbname=tournament")
+    try:
+        DB = psycopg2.connect("dbname=tournament")
+        cursor = DB.cursor()
+        return DB, cursor
+    except:
+        print 'There was a error connecting to PostgreSQL database. \
+        Please check to ensure that you have run the tournament.sql \
+        file to initialize the database.'
 
 
 def deleteMatches():
-
     """Remove all the match records from the database."""
-    DB = connect()
-    DB.cursor().execute(
-        'DELETE FROM matches;'
-        )
+    DB, cursor = connect()
+    cursor.execute(
+        'TRUNCATE matches;'
+    )
     DB.commit()
     print 'All match records deleted in SQL database'
     DB.close()
@@ -41,23 +47,25 @@ def deleteMatches():
 
 def deletePlayers():
     """Remove all the player records from the database."""
-    DB = connect()
-    DB.cursor().execute(
-        'DELETE FROM players;'
-        )
+    DB, cursor = connect()
+    cursor.execute(
+        'TRUNCATE players CASCADE;'
+    )
+    print 'WARNING! Deleting player records will also delete match records'
+    print 'You have 7 seconds to press CTRL-C to cancel function'
+    #time.sleep(7)
     DB.commit()
-    print 'All player records deleted in SQL database'
+    print 'All player and match records deleted in SQL database'
     DB.close()
 
 
 def countPlayers():
     """Returns the number of players currently registered."""
-    DB = connect()
-    c = DB.cursor()
-    c.execute(
+    DB, cursor = connect()
+    cursor.execute(
         'SELECT COUNT(*) FROM players;'
-        )
-    numPlayers = c.fetchone()[0]
+    )
+    numPlayers = cursor.fetchone()[0]
     print 'There are a total of {} players'.format(numPlayers)
     DB.close()
     return numPlayers
@@ -72,21 +80,14 @@ def registerPlayer(name):
     Args:
       name: the player's full name (need not be unique).
     """
-    name = sanitizeInputs(name)
-    DB = connect()
-    c = DB.cursor()
-    # issue how to execute sql command for names with apostrophes i.e. O'Neal
-    c.execute(
-        "INSERT INTO players (player_name) VALUES ('{}');".format(name)
-        )
+    name = (name, )
+    insert_query = "INSERT INTO players (player_name) VALUES (%s);"
+    DB, cursor = connect()
+    cursor.execute(insert_query, name)
     DB.commit()
-    # possible bug where this execute statement will select another player with
-    # the same player_name as the recently inserted player, and will return
-    # the wrong id
-    c.execute(
-        "SELECT player_id FROM players WHERE player_name = '{}';".format(name)
-        )
-    player_id = c.fetchone()[0]
+    lookup_query = "SELECT player_id FROM players WHERE player_name = %s;"
+    cursor.execute(lookup_query, name)
+    player_id = cursor.fetchone()[0]
     output = (
         'Player {} has been inserted '
         'and his Player ID is {}').format(name, player_id)
@@ -109,12 +110,11 @@ tains (id, name, wins, matches):
         matches: the number of matches the player has played
     """
     l = []
-    DB = connect()
-    c = DB.cursor()
-    c.execute(
-      "SELECT player_id, player_name, wins, total_matches FROM player_records;"
-             )
-    for row in c.fetchall():
+    DB, cursor = connect()
+    cursor.execute(
+        "SELECT player_id, player_name, wins, total_matches FROM player_records;"
+    )
+    for row in cursor.fetchall():
         l.append(row)
     DB.close()
     return l
@@ -127,18 +127,29 @@ def reportMatch(winner, loser):
       winner:  the id number of the player who won
       loser:  the id number of the player who lost
     """
-    winner, loser = sanitizeInputs(winner), sanitizeInputs(loser)
-    DB = connect()
-    c = DB.cursor()
-    c.execute(
-            ("INSERT INTO matches (winning_player_id, losing_player_id)"
-             "VALUES ('{}', '{}');").format(winner, loser)
-        )
+    winner, loser = (winner, ), (loser, )
+    query = ("INSERT INTO matches (winning_player_id, losing_player_id)"
+             "VALUES (%s, %s);")
+    DB, cursor = connect()
+    cursor.execute(query, (winner, loser))
     DB.commit()
-
-    print ("A match was recorded"
-           "with winner {} and loser {}").format(winner, loser)
+    print "Match recorded with winner %s and loser %s" % (winner, loser)
     DB.close()
+
+BYE_PLAYERS = []
+
+def give_bye(rows):
+    """If number of players is not even, one player is held out for a bye
+    (meaning this player does not play this round)
+    """
+    while True:
+        index = random.randint(0, len(rows))
+        odd_man_out = rows[index][0]
+        if odd_man_out not in BYE_PLAYERS:
+            BYE_PLAYERS.append(odd_man_out)
+            break
+    del rows[index]
+    return rows
 
 
 def swissPairings():
@@ -156,13 +167,16 @@ def swissPairings():
         id2: the second player's unique id
         name2: the second player's name
     """
-    DB = connect()
-    c = DB.cursor()
-    c.execute("select player_id, player_name from player_records")
-    rows = c.fetchall()
+    DB, cursor = connect()
+    cursor.execute("select player_id, player_name from player_records")
+    rows = cursor.fetchall()
     DB.close()
+    if len(rows) % 2 != 0:
+        rows = give_bye(rows)
+    # zip into tuples of form ((p1_id, p1_name), (p2_id, p2_name))
+    players_zipped = zip(rows[0::2], rows[1::2])
+    # transform into form (p1_id, p1_name, p2_id, p2_name)
     players_matched = []
-    for i in range(0, len(rows), 2):
-        players_matched.append((rows[i][0], rows[i][1],
-                                rows[i+1][0], rows[i+1][1]))
+    for i in players_zipped:
+        players_matched.append(i[0]+i[1])
     return players_matched
