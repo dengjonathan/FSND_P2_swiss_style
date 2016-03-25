@@ -5,21 +5,6 @@
 import psycopg2
 import random
 import time
-# storing previous pairs to ensure they do not face each other again
-previous_matches = []
-
-
-# def sanitizeInputs(input):
-#     """Takes string and sanitizes inputs for scripts and apostrophes"""
-#     input = bleach.clean(input)
-#     i = 0
-#     bad_apos = []
-#     for i in range(len(input)):
-#         if input[i] == "'":
-#             bad_apos.append(i)
-#     for i in bad_apos:
-#         input = input[:i] + "'" + input[i:]
-#     return input
 
 
 def connect():
@@ -52,8 +37,8 @@ def deletePlayers():
         'TRUNCATE players CASCADE;'
     )
     print 'WARNING! Deleting player records will also delete match records'
-    print 'You have 7 seconds to press CTRL-C to cancel function'
-    #time.sleep(7)
+    print 'You have 2 seconds to press CTRL-C to cancel function'
+    #time.sleep(2)
     DB.commit()
     print 'All player and match records deleted in SQL database'
     DB.close()
@@ -90,7 +75,7 @@ def registerPlayer(name):
     player_id = cursor.fetchone()[0]
     output = (
         'Player {} has been inserted '
-        'and his Player ID is {}').format(name, player_id)
+        'and his Player ID is {}').format(name[0], player_id)
     print output
     DB.close()
 
@@ -138,18 +123,34 @@ def reportMatch(winner, loser):
 
 BYE_PLAYERS = []
 
-def give_bye(rows):
-    """If number of players is not even, one player is held out for a bye
-    (meaning this player does not play this round)
+def give_bye(players):
+    """Returns an even number of players and gives the odd man out a bye.
+
+    Takes a list with an odd number of tuples of type (player_id, player_name)
+    and returns an even number, with id of bye player added to the list
+    BYE_PLAYERS and inputs a victory for bye player with opponent 00000 to
+    signify a BYE.
+
+    The odd player out is chosen by a random uniform distribution, however,
+    each player can only be given one bye per tournament.
     """
+    odd_man_out = None
     while True:
-        index = random.randint(0, len(rows))
-        odd_man_out = rows[index][0]
+        index = random.randint(0, len(players))
+        odd_man_out = players[index][0]
         if odd_man_out not in BYE_PLAYERS:
             BYE_PLAYERS.append(odd_man_out)
             break
-    del rows[index]
-    return rows
+    DB, cursor = connect()
+    cursor.execute(
+        "INSERT INTO players (player_name, player_id) VALUES ('_BYE_', 99999))"
+                  )
+    cursor.execute(
+        'UPDATE *'
+    )
+    reportMatch(odd_man_out, 99999)
+    del players[index]
+    return players
 
 
 def swissPairings():
@@ -178,5 +179,5 @@ def swissPairings():
     # transform into form (p1_id, p1_name, p2_id, p2_name)
     players_matched = []
     for i in players_zipped:
-        players_matched.append(i[0]+i[1])
+        players_matched.append(i[0] + i[1])
     return players_matched
