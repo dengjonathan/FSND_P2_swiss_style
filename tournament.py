@@ -1,7 +1,13 @@
 #!/usr/bin/env python
 #
+# by Jon Deng dengjonathan@gmail.com
 # tournament.py -- implementation of a Swiss-system tournament
 #
+# This file includes functions to returns queries from and update the
+# PostgreSQL database 'tournament', which will create players and matches
+# for a Swiss-Style tournament.
+#
+
 import psycopg2
 import random
 import time
@@ -38,7 +44,7 @@ def deletePlayers():
     )
     print 'WARNING! Deleting player records will also delete match records'
     print 'You have 2 seconds to press CTRL-C to cancel function'
-    #time.sleep(2)
+    time.sleep(2)
     DB.commit()
     print 'All player and match records deleted in SQL database'
     DB.close()
@@ -97,7 +103,7 @@ tains (id, name, wins, matches):
     l = []
     DB, cursor = connect()
     cursor.execute(
-        "SELECT player_id, player_name, wins, total_matches FROM player_records;"
+      "SELECT player_id, player_name, wins, total_matches FROM player_records;"
     )
     for row in cursor.fetchall():
         l.append(row)
@@ -118,25 +124,28 @@ def reportMatch(winner, loser):
     DB, cursor = connect()
     cursor.execute(query, (winner, loser))
     DB.commit()
-    print "Match recorded with winner %s and loser %s" % (winner, loser)
+    print "Match recorded with winner %s and loser %s" % (winner[0], loser[0])
     DB.close()
 
 BYE_PLAYERS = []
 
 def give_bye(players):
-    """Returns an even number of players and gives the odd man out a bye.
+    """Removes a randomly chosen player for a bye and adds a win to record
 
-    Takes a list with an odd number of tuples of type (player_id, player_name)
-    and returns an even number, with id of bye player added to the list
-    BYE_PLAYERS and inputs a victory for bye player with opponent 00000 to
-    signify a BYE.
+    Args: list with an odd number of tuples of type (player_id, player_name)
 
-    The odd player out is chosen by a random uniform distribution, however,
-    each player can only be given one bye per tournament.
+    Returns:
+        An even number of tuples, removing a randomly chosen odd_man_out
+        to receive a bye.
+
+    The odd_man_out is given a 'free' win, implemented by creating a
+    match where they play themselves. The odd player is stored in the global
+    variable BYE_PLAYERS, so they cannot recieve more than one bye per
+    tournament.
     """
     odd_man_out = None
     while True:
-        index = random.randint(0, len(players))
+        index = random.randint(0, len(players)-1)
         odd_man_out = players[index][0]
         if odd_man_out not in BYE_PLAYERS:
             BYE_PLAYERS.append(odd_man_out)
@@ -170,9 +179,7 @@ def swissPairings():
     DB.close()
     if len(rows) % 2 != 0:
         rows = give_bye(rows)
-    # zip into tuples of form ((p1_id, p1_name), (p2_id, p2_name))
     players_zipped = zip(rows[0::2], rows[1::2])
-    # transform into form (p1_id, p1_name, p2_id, p2_name)
     players_matched = []
     for i in players_zipped:
         players_matched.append(i[0] + i[1])
