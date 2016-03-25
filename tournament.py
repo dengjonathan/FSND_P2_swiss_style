@@ -165,7 +165,7 @@ def give_bye(players):
                  " WHERE winning_player_id = losing_player_id"
                  " AND winning_player_id = %s;" % odd_man_out)
         cursor.execute(query)
-        if cursor.fetchone() == None:
+        if cursor.fetchone() is None:
             break
     print "This match %s is given a bye." % odd_man_out
     # Add a "free" win to odd man playing themself.  This win is excluded from
