@@ -5,7 +5,7 @@
 #
 # If you do add any of the extra credit options, be sure to add/modify these test cases
 # as appropriate to account for your module's added functionality.
-
+import random
 from tournament import *
 
 def testCount():
@@ -175,16 +175,31 @@ def testPairingsOdd():
     if len(pairings) != 4:
         raise ValueError(
             "For eight players, swissPairings should return 4 pairs. Got {pairs}".format(pairs=len(pairings)))
-    print "Players %s were given byes in the two rounds" % BYE_PLAYERS
-    if len(BYE_PLAYERS) == 0:
-        raise ValueError(
-            "Odd man out should have been recorded in BYE_PLAYERS so that he is not given a 2nd bye"
-        )
-    if BYE_PLAYERS[0] == BYE_PLAYERS[1]:
-        raise ValueError(
-            "Player %s was given a bye twice- which shouldn't happen in this tournament."
-        )
-    print "11. When there is an odd number of players, one player randomly given a bye. Each"
+    # test if there is one player who had a bye
+    DB, cursor = connect()
+    query = ("SELECT COUNT (distinct winning_player_id) from matches "
+                   "WHERE winning_player_id = losing_player_id;")
+    cursor.execute(query)
+    # TODO fix SQL query to count distinct
+    num_bye_players = cursor.fetchone()[0]
+    if num_bye_players == 2:
+        print "After one round played, and the 2nd round paired, there should be two players given byes."
+    else:
+        raise ValueError("%s player(s) were given a bye. It should be 2." % num_bye_players)
+    for pairing in pairings:
+        # returns 0 or 2 to randomly decide winner from tuple (id1,name1, id2, name2)
+        winner = random.randint(0,1) * 2
+        reportMatch(pairing[winner], pairing[(2 - winner)])
+    pairings = swissPairings()
+    query = ("SELECT count (distinct winning_player_id) from matches "
+                   "WHERE winning_player_id = losing_player_id;")
+    cursor.execute(query)
+    num_bye_players = cursor.fetchone()[0]
+    if num_bye_players == 3:
+        print "After two rounds and three pairings three distinct players were given byes and free wins."
+    else:
+        raise ValueError("%s player(s) were given a bye. It should be 3." % num_bye_players)
+    print "11. When there is an odd number of players, one player is randomly given a bye each round. Each"
     print "player will only be given a bye one time in the tournament."
 
 if __name__ == '__main__':

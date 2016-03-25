@@ -1,25 +1,28 @@
 #!/usr/bin/env python
 #
+# by Jon Deng dengjonathan@gmail.com
 # tournament.py -- implementation of a Swiss-system tournament
+#
+# This file includes functions to returns queries from and update the
+# PostgreSQL database 'tournament', which will create players and matches
+# for a Swiss-Style tournament.
 #
 import psycopg2
 import random
-import time
-# storing previous pairs to ensure they do not face each other again
-previous_matches = []
 
+PRINT_WARNINGS = False
 
-# def sanitizeInputs(input):
-#     """Takes string and sanitizes inputs for scripts and apostrophes"""
-#     input = bleach.clean(input)
-#     i = 0
-#     bad_apos = []
-#     for i in range(len(input)):
-#         if input[i] == "'":
-#             bad_apos.append(i)
-#     for i in bad_apos:
-#         input = input[:i] + "'" + input[i:]
-#     return input
+def sanitizeInputs(input):
+    """Takes string and sanitizes inputs for scripts and apostrophes"""
+    input = bleach.clean(input)
+    i = 0
+    bad_apos = []
+    for i in range(len(input)):
+        if input[i] == "'":
+            bad_apos.append(i)
+    for i in bad_apos:
+        input = input[:i] + "'" + input[i:]
+    return input
 
 
 def connect():
@@ -51,9 +54,10 @@ def deletePlayers():
     cursor.execute(
         'TRUNCATE players CASCADE;'
     )
-    print 'WARNING! Deleting player records will also delete match records'
-    print 'You have 7 seconds to press CTRL-C to cancel function'
-    #time.sleep(7)
+    if PRINT_WARNINGS:
+        print 'WARNING! Deleting player records will also delete match records'
+        print 'You have 2 seconds to press CTRL-C to cancel function'
+        time.sleep(2)
     DB.commit()
     print 'All player and match records deleted in SQL database'
     DB.close()
@@ -90,7 +94,7 @@ def registerPlayer(name):
     player_id = cursor.fetchone()[0]
     output = (
         'Player {} has been inserted '
-        'and his Player ID is {}').format(name, player_id)
+        'and his Player ID is {}').format(name[0], player_id)
     print output
     DB.close()
 
@@ -109,13 +113,11 @@ tains (id, name, wins, matches):
         wins: the number of matches the player has won
         matches: the number of matches the player has played
     """
-    l = []
     DB, cursor = connect()
     cursor.execute(
-        "SELECT player_id, player_name, wins, total_matches FROM player_records;"
+      "SELECT player_id, player_name, wins, total_matches FROM player_records;"
     )
-    for row in cursor.fetchall():
-        l.append(row)
+    l = cursor.fetchall()
     DB.close()
     return l
 
@@ -133,23 +135,45 @@ def reportMatch(winner, loser):
     DB, cursor = connect()
     cursor.execute(query, (winner, loser))
     DB.commit()
-    print "Match recorded with winner %s and loser %s" % (winner, loser)
+    print "Match recorded with winner %s and loser %s" % (winner[0], loser[0])
     DB.close()
 
-BYE_PLAYERS = []
 
-def give_bye(rows):
-    """If number of players is not even, one player is held out for a bye
-    (meaning this player does not play this round)
+# BYE_PLAYERS = []
+
+
+def give_bye(players):
+    """Removes a randomly chosen player for a bye and adds a win to record
+
+    Args: list with an odd number of tuples of type (player_id, player_name)
+
+    Returns:
+        An even number of tuples, removing a randomly chosen odd_man_out
+        to receive a bye.
+
+    The odd_man_out is given a 'free' win, implemented by creating a
+    match where they play themselves. The odd player is stored in the global
+    variable BYE_PLAYERS, so they cannot recieve more than one bye per
+    tournament.
     """
+    odd_man_out = None
+    DB, cursor = connect()
     while True:
-        index = random.randint(0, len(rows))
-        odd_man_out = rows[index][0]
-        if odd_man_out not in BYE_PLAYERS:
-            BYE_PLAYERS.append(odd_man_out)
+        index = random.randint(0, len(players)-1)
+        odd_man_out = players[index][0]
+        query = ("SELECT winning_player_id FROM matches"
+                 " WHERE winning_player_id = losing_player_id"
+                 " AND winning_player_id = %s;" % odd_man_out)
+        cursor.execute(query)
+        if cursor.fetchone() == None:
             break
-    del rows[index]
-    return rows
+    print "This match %s is given a bye." % odd_man_out
+    # Add a "free" win to odd man playing themself.  This win is excluded from
+    # Opponent Match Wins (OMW) ranking using a SQL WHERE restriction in
+    # view player_records in tournament.sql
+    reportMatch(odd_man_out, odd_man_out)
+    del players[index]
+    return players
 
 
 def swissPairings():
@@ -176,6 +200,9 @@ def swissPairings():
     # zip into tuples of form ((p1_id, p1_name), (p2_id, p2_name))
     players_zipped = zip(rows[0::2], rows[1::2])
     # transform into form (p1_id, p1_name, p2_id, p2_name)
+    if len(rows) % 2 != 0:
+        rows = give_bye(rows)
+    players_zipped = zip(rows[0::2], rows[1::2])
     players_matched = []
     for i in players_zipped:
         players_matched.append(i[0]+i[1])
