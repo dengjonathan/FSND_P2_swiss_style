@@ -141,14 +141,10 @@ def give_bye(players):
         if odd_man_out not in BYE_PLAYERS:
             BYE_PLAYERS.append(odd_man_out)
             break
-    DB, cursor = connect()
-    cursor.execute(
-        "INSERT INTO players (player_name, player_id) VALUES ('_BYE_', 99999))"
-                  )
-    cursor.execute(
-        'UPDATE *'
-    )
-    reportMatch(odd_man_out, 99999)
+    # Add a "free" win to odd man playing themself.  This win is excluded from
+    # Opponent Match Wins (OMW) ranking using a SQL WHERE restriction in
+    # view player_records in tournament.sql
+    reportMatch(odd_man_out, odd_man_out)
     del players[index]
     return players
 
